@@ -1,0 +1,23 @@
+This directory was created in Nov 10. 
+
+Tan copied the code to generate correlations at /data/nil-external/dcl/Events152_fMRI_NeuralMechanisms/voxelwiseAnalyses/knitr/newMatlabCorrelations_dtFixed
+and change names of the scripts while keeping knitted files (for reference later). Also copied correlations between parcels and movie stats, parcels and PE to movieStatCorrs and PECorrs
+
+format of correlation files:
+"sub.id" "start.at" "p1" "p2" ...
+"1" "sub-01" "corrAt0" 0.0494188534819104 0.0573702682205282 ...
+
+UPDATE Nov 28:
+Tan cleans up and restructure this directory a bit. (old files were moved to archive)
+
+For all movies, Tan copied raw pe stat and put them in movie_pe_stat/ and raw visual (cleaned of artifact) stats and put then in movie_visual_stats/ 
+	from BOX: C:\Users\nguye\Box\DCL_ARCHIVE\Documents\Events\exp152_fMRIneuralmechanisms\exp152_Session_2\movies\
+These stats are input for convolution code (doResample.m and convo_pe.m) to generate HRF for these raw signals. 
+Convoluted HRF scores are at out_convo_pe/ and out_convo_visual/. These scores were copied from Penfield: /data/nil-external/dcl/Events152_fMRI_NeuralMechanisms/voxelwiseAnalyses/matlab_resampling2
+
+R script Feature_Parcel_Correlations.rnw calculates correlation between movie signals (visual stats or pe) and parcel-average timeseries and save them at {Visual/PE}Corrs_1_500 where 1 is the start TR and 500 is the last TR (a movie has typically 400TRs, so 1_200 means the first half of the movie. 500 > max(#TRs) so it'll be the whole movie)
+format of correlation files for reference:
+"sub.id" "start.at" "p1" "p2" ...
+"1" "sub-01" "corrAt0" 0.0494188534819104 0.0573702682205282 ...
+
+last edited by Tan Nguyen on 2019-11-28 11:28:29
