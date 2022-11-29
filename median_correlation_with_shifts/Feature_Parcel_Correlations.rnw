@@ -27,13 +27,31 @@ run.ids <- 1:4;
 nframes <- c(405, 467, 404, 444);  # number of frames in each run, run.ids order
 movie.ids <- c("1.2.3_C1_trim", "6.3.9_C1_trim", "3.1.3_C1_trim", "2.4.1_C1_trim");  # clip names in run.ids order; see analysisPrep.R
 mov.ids <- c("1.2.3", "6.3.9", "3.1.3", "2.4.1");  # clip names in run.ids order; see analysisPrep.R
-# directory for PE feature files
-feature_dir <- paste0(in.path, "knitr_tan/median_correlation_with_shifts/PECorrs_1_150/")
-# check if feature_dir exists
-if (!file.exists(feature_dir)) {
-  dir.create(feature_dir)
+
+## Feature-specific parameters can be changed here to switch between PE and visual features (e.g. pixel change mean)
+# features <- c("pe")
+features <- c("pixel_change_mean")
+# first and last TR of movie stat timeseries to correlate with parcel timeseries
+first <- 1
+last <- 500  # this number can exceed nframes, which is ok.
+# input directory of the convoluted feature timeseries
+# in_feature_dir <- paste0(in.path, "matlab_resampling2/out_convo_pe/")
+in_feature_dir <- paste0(in.path, "matlab_resampling2/out_convo_visual/")
+# directory for output correlation between feature timeseries and parcel timeseries
+# out_corr_dir <- paste0(in.path, "knitr_tan/median_correlation_with_shifts/PECorrs_", first, "_", last, "/")
+out_corr_dir <- paste0(in.path, "knitr_tan/median_correlation_with_shifts/VisualCorrs_", first, "_", last, "/")
+# check if out_corr_dir exists
+if (!file.exists(out_corr_dir)) {
+  dir.create(out_corr_dir)
 }
 
+onset.tbl <- read.table(paste0(in.path, "e152onsets.txt"));  # delay between first TR and movie onset, in sec
+#  head(onset.tbl)
+#   sub.id sub.lbl run1_1.2.3 run2_6.3.9 run3_3.1.3 run4_2.4.1
+# 1 sub-01 e152003   7.900409   8.328984   7.929364   8.195244
+# 2 sub-02 e152004   8.856364   8.909626   8.313563   8.564747
+feature.onsets <- c(6.16, 7.88, 5.52, 6.82) # in seconds, the delay between movie onset and PE onset.
+# feature.onsets <- c(0, 0, 0, 0) # in seconds, if we use visual features such as pixel change, onset.tbl is enough.
 
 
 
@@ -88,13 +106,6 @@ sch.ids <- 1:400;   # Schaefer2018_400x7 parcellation
 plot.slices <- round(seq(from=27, to=72, length.out=10));   # slices to show
 
 
-onset.tbl <- read.table(paste0(in.path, "e152onsets.txt"));  # delay between first TR and movie onset, in sec
-#  head(onset.tbl)
-#   sub.id sub.lbl run1_1.2.3 run2_6.3.9 run3_3.1.3 run4_2.4.1
-# 1 sub-01 e152003   7.900409   8.328984   7.929364   8.195244
-# 2 sub-02 e152004   8.856364   8.909626   8.313563   8.564747
-pe.onsets <- c(6.16, 7.88, 5.52, 6.82) # in seconds, the delay between movie onset and PE onset.
-
 # column names and order of the movie-stat input files
 #mstat.ids <- c("time", "pixel_change_mean", "pixel_change_var" , "luminance_mean", "luminance_var");
 
@@ -112,14 +123,14 @@ just.plot.subject <- function(do.col, do.start, rid, sid) {
     if (do.par == "Schaefer2018_400x7") {
       p.lbls <- sch.ids # 1:400
       p.img <- sch.img
-      fname <- paste0(feature_dir, "matlabCorrs_", do.col, "_run", rid, "_dtFixed.txt")
+      fname <- paste0(out_corr_dir, "matlabCorrs_", do.col, "_run", rid, "_dtFixed.txt")
       # print(paste("Loading", fname));
       cor.tbl <- read.table(fname)
     }
     if (do.par == "subcortical") {
       p.lbls <- subcort.tbl$HCP.label
       p.img <- sub.img
-      fname <- paste0(feature_dir, "matlabCorrs_", do.col, "_run", rid, "_dtFixed_subcortical.txt")
+      fname <- paste0(out_corr_dir, "matlabCorrs_", do.col, "_run", rid, "_dtFixed_subcortical.txt")
       cor.tbl <- read.table(fname)
     }
     # use column name since parcel order not fixed for subcortical
@@ -133,7 +144,7 @@ just.plot.subject <- function(do.col, do.start, rid, sid) {
       temp.img[which(p.img == pid)] <- val
     }
   }
-  plot.volume(temp.img, under.img, neg.lims = nlims, pos.lims = plims, ttl = paste0(do.start, movie.ids[rid], " ", do.col))
+  plot.volume(temp.img, under.img, neg.lims = nlims, pos.lims = plims, ttl = paste0(do.start, movie.ids[rid], do.col))
 }
 
 # This function load the parcel-avg and pe correlation (created by corr.parcel.pe) and plot median correlation across subjects.
@@ -171,17 +182,17 @@ just.plot.median <- function(do.col, do.start, rid) {   # do.col <- "pe"; do.sta
 
 # This function load parcel-average timeseries for each subject, shift them and correlate it with PE timeseries.
 # All correlations are saved in a single .txt file
-corr.parcel.pe <- function(do.col, do.starts, rid, from, to) {
+corr.parcel.pe <- function(do.col, do.starts, rid, from, to, sub.ids) {
   # do.starts <- 0:1; rid <- 1; do.col <- "pe";   # which column of the movie-stat file to correlate the BOLD against, rid is movie id.
   # from <- 1; to <- 100;   # the duration of the movie in TRs to correlate the BOLD against.
   for (do.par in c("Schaefer2018_400x7", "subcortical")) {
     if (do.par == "Schaefer2018_400x7") {
-      fname.out <- paste0(feature_dir, "matlabCorrs_", do.col, "_run", rid, "_dtFixed.txt")
+      fname.out <- paste0(out_corr_dir, "matlabCorrs_", do.col, "_run", rid, "_dtFixed.txt")
       p.lbls <- sch.ids
       suff <- suff_sch
     }
     if (do.par == "subcortical") {
-      fname.out <- paste0(feature_dir, "matlabCorrs_", do.col, "_run", rid, "_dtFixed_subcortical.txt")
+      fname.out <- paste0(out_corr_dir, "matlabCorrs_", do.col, "_run", rid, "_dtFixed_subcortical.txt")
       p.lbls <- subcort.tbl$HCP.label
       suff <- suff_subcortical
     }
@@ -200,8 +211,8 @@ corr.parcel.pe <- function(do.col, do.starts, rid, from, to) {
             stop("wrong np.tbl.")
           }
           sub.onset <- onset.tbl[which(onset.tbl$sub.id == paste0("sub-", sub.ids[sid])), paste0("run", rid, "_", mov.ids[rid])] # onset in seconds
-          pe.onset <- pe.onsets[rid]
-          total_onset <- sub.onset + pe.onset
+          feature.onset <- feature.onsets[rid]
+          total_onset <- sub.onset + feature.onset
           TR.onset <- round(total_onset / TR) # onset in TR, combining subject (scanning started before movie onset) and pe onset (pe starts not at movie onset but later).
 
           nps.lst[[sid]] <- np.tbl[(TR.onset:nrow(np.tbl)), ] # keep frames, starting at movie + PE start
@@ -212,8 +223,8 @@ corr.parcel.pe <- function(do.col, do.starts, rid, from, to) {
       rm(np.tbl, fname) # cleanup
 
       # load convoluted PE for this movie, used for all people
-      pe.vec <- read.csv(paste0(in.path, "matlab_resampling2/out_convo_pe/conv_", mov.ids[rid], "_", do.col, "_dtFix.csv"), header = FALSE)
-      pe.vec <- unlist(pe.vec[1, ], use.names = FALSE)
+      feature.vec <- read.csv(paste0(in_feature_dir, "conv_", mov.ids[rid], "_", do.col, "_dtFix.csv"), header = FALSE)
+      feature.vec <- unlist(feature.vec[1, ], use.names = FALSE)
 
       # one output file, set of starts
       # trim 5-10 points off the front of the movie timeseries to avoid the starting big-dip????
@@ -226,20 +237,32 @@ corr.parcel.pe <- function(do.col, do.starts, rid, from, to) {
         # sub.onset <- onset.tbl[which(onset.tbl$sub.id == paste0("sub-", sub.ids[sid])), paste0("run", rid, "_", movie.ids[rid])];
 
         for (do.start in do.starts) { #  sid <- 2;  do.start <- 0;
-          pe.vec2 <- pe.vec # reset
-          pe.vec2 <- pe.vec2[from:min(to, nrow(pe.vec2))] # trim off the movie
+          feature.vec2 <- feature.vec # reset
+          # feature.vec is a vector, so nrow(feature.vec) return NULL, use length instead.
+          feature.vec2 <- feature.vec2[from: min(to, length(feature.vec2))] # trim off the movie
+
+          # each element of nps.lst is a table (np.tbl), nrow is #frames, ncol is #parcels
           do.TRs <- (1 + do.start + from - 1):nrow(nps.lst[[sid]]) # frames in this run, starting at do.start
-          if (length(do.TRs) < length(pe.vec2)) {
-            pe.vec2 <- pe.vec2[1:length(do.TRs)]
+
+          if (length(do.TRs) < length(feature.vec2)) {
+            feature.vec2 <- feature.vec2[1:length(do.TRs)]
           } # trim end of movie so vectors match length
-          if (length(pe.vec2) < length(do.TRs)) {
-            do.TRs <- do.TRs[1:length(pe.vec2)]
+          if (length(feature.vec2) < length(do.TRs)) {
+            do.TRs <- do.TRs[1:length(feature.vec2)]
           }
+
           out.tbl$sub.id[ctr] <- paste0("sub-", sub.ids[sid])
           out.tbl$start.at[ctr] <- paste0("corrAt", do.start)
           for (pid in 1:length(p.lbls)) {
-            out.tbl[ctr, pid + 2] <- cor(nps.lst[[sid]][do.TRs, pid], pe.vec2, method = "pearson")
+            corr <- cor(nps.lst[[sid]][do.TRs, pid], feature.vec2, method = "pearson")
+            # check if corr is NA
+            if (is.na(corr)) {
+              print("corr is NA, check values below for clues")
+              print(paste0("sid=", sid, " do.start=", do.start, " do.TRs=", length(do.TRs), " feature.vec2=", length(feature.vec2)))
+            }
+            out.tbl[ctr, pid + 2] <- corr
           }
+          # print(paste0("corrs=", out.tbl[ctr, 1:ncol(out.tbl)]))
           ctr <- ctr + 1
         }
       }
@@ -271,7 +294,7 @@ corr.parcel.pe <- function(do.col, do.starts, rid, from, to) {
 
 
 \newpage
-\noindent pe  \par
+\noindent Correlation  \par
 \vspace{0.2 cm} 
 <<code2legend, echo=FALSE, dev='pdf', fig.height=0.3, fig.width=7.5, fig.align="center">>=
 par(oma = rep(0.2, 4), mar = rep(0, 4), mgp = rep(0, 3))
@@ -297,15 +320,16 @@ text(x=128, y=0, labels=plims[2], adj=0, cex=0.7);
 <<code2, dev='pdf', cache=TRUE, echo=FALSE, fig.height=1, fig.width=8, fig.align='center'>>=
 
 #for (i in 1:4) { just.plot("pixel_change_mean", 0, i); }
-for (i in 1:4) {
-  print(paste("calculate correlations for run", movie.ids[i], "at various starts (starts in TR)"));
-  corr.parcel.pe("pe", 0:5, i, 1, 150)
+for (do.col in features) {
+  for (i in 1:4) {
+    print(paste("calculate", do.col, "correlations for run", movie.ids[i], "at various starts (starts in TR)"))
+    corr.parcel.pe(do.col, 0:0, i, first, last, sub.ids)
+  }
 }
-
 @
 
 \newpage
-\noindent pe  \par
+\noindent Correlation  \par
 \vspace{0.4 cm}
 
 <<code4legend, echo=FALSE, dev='pdf', fig.height=0.3, fig.width=7.5, fig.align="center">>=
@@ -326,13 +350,35 @@ text(x=66, y=0, labels=plims[1], adj=1, cex=0.7)
 text(x=128, y=0, labels=plims[2], adj=0, cex=0.7)
 
 @
+
 \vspace{0.2 cm}
-<<code4, dev='pdf', cache=TRUE, echo=FALSE, fig.height=1, fig.width=8, fig.align='center', results='asis'>>=
-# <<code4, dev='pdf', cache=TRUE, echo=FALSE, fig.height=1, fig.width=8, fig.align='center'>>=
 
 
-# grouping by subject
-# for (do.col in c("pe")) {
+<<code4, dev='pdf', cache=TRUE, echo=FALSE, fig.height=1, fig.width=8, fig.align='center', results='asis', eval=TRUE>>=
+# https://bookdown.org/yihui/rmarkdown-cookbook/results-asis.html: By default, text output from code chunks will be written out verbatim with two leading hashes (see Section 11.12). The text is verbatim because knitr puts it in fenced code blocks (```). If you do not want the text to be in a fenced code block (or the leading hashes), you can set the chunk option results='asis'. This is useful to programmatically break pages using cat("\n\\newpage\n"). However, it will break other printing functions, either cat or print, if the string contain "LaTEX" characters such as \ or _ (e.g. pixel_change_mean). Notice, \n will break print but not cat because print also add quotes ("") and [1] in front of the string (e.g. [1] "haha"), and "\n is an incorrect syntax. If print is used, make sure there is no \n in the string.
+
+
+cat("\n\nGrouping by Movie")
+# grouping by movie
+for (do.col in features) {
+  str <- paste("\n\ncalculate", do.col, "correlations with parcel timeseries")
+  # replace underscores with spaces
+  str <- gsub("_", " ", str)
+  cat(str)
+  for (i in 1:4) {
+    for (sid in 1:length(sub.ids)) {
+      str <- paste("\n\nsubjects", sid, "run", mov.ids[i])
+      str <- gsub("_", " ", str)
+      cat(str)
+      just.plot.subject(do.col, 0, i, sid)
+    }
+    cat("\n\\newpage\n")
+  }
+}
+
+# print("Grouping by Subject")
+# # grouping by subject
+# for (do.col in features) {
 #   print(paste(do.col, "stats"));
 #   for (sid in 1:47) {
 #     for (i in 1:4) {
@@ -342,18 +388,6 @@ text(x=128, y=0, labels=plims[2], adj=0, cex=0.7)
 #     cat("\n\\newpage\n");
 #   }
 # }
-
-# grouping by movie
-for (do.col in c("pe")) {
-  print(paste(do.col, "stats"));
-  for (i in 1:4) {
-    for (sid in 1:47) {
-      print(paste("subject", sid, "run", mov.ids[i], do.col, "stats"), quote=FALSE);
-      just.plot.subject(do.col, 0, i, sid);
-    }
-    cat("\n\\newpage\n");
-  }
-}
 @
 
 
